@@ -17,6 +17,7 @@ RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
         ca-certificates \
         git \
+        libnccl2="${NCCL_PACKAGE_VERSION}" \
         libnccl-dev="${NCCL_PACKAGE_VERSION}" \
         libopenmpi-dev \
         make \

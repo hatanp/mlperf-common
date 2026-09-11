@@ -117,3 +117,13 @@ Example of use:
 verify-mounts.sh "/data,/checkpoints"
 ```
 The directory where `verify-mounts.sh` is located should contain `cont-mount-info.sh` file generated earlier by `get-mount-info.sh`.
+
+## Utility container
+
+The root [`Dockerfile`](Dockerfile) builds a small CUDA, NCCL, MPI, RDMA, and
+data-movement image for launch-time work that should not depend on a benchmark
+framework container. It includes the one-rank-per-GPU `ncclstage` dataset
+staging tool but does not include PyTorch or a training framework.
+
+See [`container/README.md`](container/README.md) for the image contents, build
+command, runtime scope, and deployment considerations.

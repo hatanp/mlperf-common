@@ -18,6 +18,8 @@ and installs the pinned NVIDIA `cuda.bindings` wheel used by `ncclstage`. Exact
 Open MPI and UCX packages are downloaded from the public, versioned DOCA
 repository for the selected AMD64 or ARM64 build platform, verified against
 architecture-specific SHA-256 digests, and installed normally through `apt`.
+The package-selected MPI prefix is exposed through the conventional
+`/usr/local/mpi` compatibility link used by NVIDIA framework builds.
 Only those two DOCA packages are included; the image does not install a broad
 DOCA profile, host drivers, optional NCCL plugins, SHARP, or the standalone
 HPC-X bundle. The wheel and its runtime dependencies use a flat application

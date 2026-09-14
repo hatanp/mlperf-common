@@ -72,6 +72,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* /tmp/mpi-packages \
     && test "$(dpkg-query -W -f='${Version}' openmpi)" = "${OPENMPI_PACKAGE_VERSION}" \
     && test "$(dpkg-query -W -f='${Version}' ucx)" = "${UCX_PACKAGE_VERSION}" \
+    && mpi_home="$(dirname "$(dirname "$(readlink -f /usr/bin/mpicc)")")" \
+    && ln -s "${mpi_home}" /usr/local/mpi \
     && test -x /usr/local/mpi/bin/mpicc
 
 RUN python3 -m pip install \
@@ -158,7 +160,10 @@ RUN apt-get update \
         zstd \
     && rm -rf /var/lib/apt/lists/* /tmp/mpi-packages \
     && test "$(dpkg-query -W -f='${Version}' openmpi)" = "${OPENMPI_PACKAGE_VERSION}" \
-    && test "$(dpkg-query -W -f='${Version}' ucx)" = "${UCX_PACKAGE_VERSION}"
+    && test "$(dpkg-query -W -f='${Version}' ucx)" = "${UCX_PACKAGE_VERSION}" \
+    && mpi_home="$(dirname "$(dirname "$(readlink -f /usr/bin/mpicc)")")" \
+    && ln -s "${mpi_home}" /usr/local/mpi \
+    && test -x /usr/local/mpi/bin/mpicc
 
 COPY --from=builder /src/nccl-tests/build/*_perf_mpi /usr/local/bin/
 COPY --from=builder /opt/ncclstage /opt/ncclstage

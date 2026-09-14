@@ -141,6 +141,11 @@ ENV PATH=/usr/local/mpi/bin:${PATH}
 RUN ln -s /opt/hpcx/ompi /usr/local/mpi \
     && ln -s /opt/ncclstage/app/ncclstage.py /usr/local/bin/ncclstage \
     && chmod 0755 /opt/ncclstage/app/ncclstage.py \
+    && printf '%s\n' \
+        /opt/hpcx/ompi/lib \
+        /opt/hpcx/ucx/lib \
+        > /etc/ld.so.conf.d/hpcx.conf \
+    && ldconfig \
     && test "$(cat /opt/hpcx/VERSION | head -n 1)" = "HPC-X ${HPCX_VERSION}" \
     && test -x "$(command -v mpirun)" \
     && ompi_info --version \

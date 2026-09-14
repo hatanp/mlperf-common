@@ -18,8 +18,10 @@ the pinned NVIDIA `cuda.bindings` wheel used by `ncclstage`. HPC-X is downloaded
 from NVIDIA's public distribution site for the selected AMD64 or ARM64 build
 platform, verified against an architecture-specific SHA-256 digest, and
 installed below `/opt/hpcx`; `/usr/local/mpi` selects its default Open MPI
-tree. HPC-X is not sourced globally, and its optional NCCL and SHARP plugins
-are not added to the default loader path. The wheel and its
+tree. The Open MPI and matching UCX library directories are registered with
+the system dynamic loader, avoiding launcher-specific `LD_LIBRARY_PATH`
+requirements. HPC-X is not sourced globally, and its optional NCCL and SHARP
+plugins are not added to the default loader path. The wheel and its
 runtime dependencies use a flat application path; the final image does not
 copy a virtual environment, pip, setuptools, activation scripts, or generated
 Python bytecode. Full system Python is retained because the readable NCCL

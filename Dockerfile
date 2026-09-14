@@ -1,5 +1,20 @@
 # syntax=docker/dockerfile:1
 
+# Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 ARG CUDA_VERSION=13.3.0
 ARG UBUNTU_VERSION=24.04
 ARG NCCL_PACKAGE_VERSION=2.30.7-1+cuda13.3
@@ -14,6 +29,7 @@ ARG UCX_SHA256_X86_64=3c000ccf8feeb1af8e58bc9d82f3ef0f4538e1f2fadd4b63294fca62d7
 
 FROM ubuntu:${UBUNTU_VERSION} AS mpi-packages
 
+ARG UBUNTU_VERSION
 ARG DOCA_VERSION
 ARG OPENMPI_PACKAGE_VERSION
 ARG UCX_PACKAGE_VERSION
@@ -35,7 +51,7 @@ RUN apt-get update \
         amd64) repo_arch=x86_64; deb_arch=amd64; openmpi_sha256="${OPENMPI_SHA256_X86_64}"; ucx_sha256="${UCX_SHA256_X86_64}" ;; \
         *) echo "Unsupported DOCA package architecture: ${TARGETARCH}" >&2; exit 1 ;; \
        esac \
-    && repo_url="https://linux.mellanox.com/public/repo/doca/${DOCA_VERSION}/ubuntu24.04/${repo_arch}/pool" \
+    && repo_url="https://linux.mellanox.com/public/repo/doca/${DOCA_VERSION}/ubuntu${UBUNTU_VERSION}/${repo_arch}/pool" \
     && mkdir -p /packages \
     && curl --fail --location \
         "${repo_url}/openmpi_${OPENMPI_PACKAGE_VERSION}_${deb_arch}.deb" \

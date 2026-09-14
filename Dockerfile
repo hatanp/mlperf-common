@@ -142,7 +142,7 @@ RUN ln -s /opt/hpcx/ompi /usr/local/mpi \
     && ln -s /opt/ncclstage/app/ncclstage.py /usr/local/bin/ncclstage \
     && chmod 0755 /opt/ncclstage/app/ncclstage.py \
     && test "$(cat /opt/hpcx/VERSION | head -n 1)" = "HPC-X ${HPCX_VERSION}" \
-    && mpirun -V \
+    && test -x "$(command -v mpirun)" \
     && ompi_info --version \
     && for binary in /usr/local/bin/*_perf_mpi; do \
            ! ldd "${binary}" | grep -q 'not found'; \

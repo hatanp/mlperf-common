@@ -4,49 +4,64 @@ ARG CUDA_VERSION=13.3.0
 ARG UBUNTU_VERSION=24.04
 ARG NCCL_PACKAGE_VERSION=2.30.7-1+cuda13.3
 ARG CUDA_BINDINGS_VERSION=13.3.1
-ARG HPCX_VERSION=v2.24.1
-ARG HPCX_SHA256_AARCH64=0bc5c26a4f0ca98fd6292aac9d51cc2a4ee3277d38d4011b64eafd133be633b4
-ARG HPCX_SHA256_X86_64=b34ae9a65ef653be6590147b747091c3c3753210bc98ad74a2304e6d95d5795b
+ARG DOCA_VERSION=3.5.0
+ARG OPENMPI_PACKAGE_VERSION=5.0.10rc2.2608140153-1.3c5e09e178
+ARG UCX_PACKAGE_VERSION=1.22.0.2608140153-1.8a6b06fb8
+ARG OPENMPI_SHA256_AARCH64=2678ac4e5e190b874411384481b48c0705d391cd4c61fc9025136dbad27a87ef
+ARG OPENMPI_SHA256_X86_64=9466ab2f034261a0bfe533be63af3d74d435c1738f3cf7a0dbb1bd1db7f3139b
+ARG UCX_SHA256_AARCH64=4fbbaeacb987ddd73052c4035b8932c7e205fbf99a327c9e1a9f6647501a5ed5
+ARG UCX_SHA256_X86_64=3c000ccf8feeb1af8e58bc9d82f3ef0f4538e1f2fadd4b63294fca62d7bae74f
 
-FROM nvcr.io/nvidia/cuda:${CUDA_VERSION}-devel-ubuntu${UBUNTU_VERSION} AS hpcx
+FROM ubuntu:${UBUNTU_VERSION} AS mpi-packages
 
-ARG HPCX_VERSION
-ARG HPCX_SHA256_AARCH64
-ARG HPCX_SHA256_X86_64
+ARG DOCA_VERSION
+ARG OPENMPI_PACKAGE_VERSION
+ARG UCX_PACKAGE_VERSION
+ARG OPENMPI_SHA256_AARCH64
+ARG OPENMPI_SHA256_X86_64
+ARG UCX_SHA256_AARCH64
+ARG UCX_SHA256_X86_64
 ARG TARGETARCH
 
 SHELL ["/bin/bash", "-eux", "-c"]
 
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
-        bzip2 \
         ca-certificates \
         curl \
     && rm -rf /var/lib/apt/lists/* \
     && case "${TARGETARCH}" in \
-        arm64) hpcx_arch=aarch64; hpcx_sha256="${HPCX_SHA256_AARCH64}" ;; \
-        amd64) hpcx_arch=x86_64; hpcx_sha256="${HPCX_SHA256_X86_64}" ;; \
-        *) echo "Unsupported HPC-X architecture: ${TARGETARCH}" >&2; exit 1 ;; \
+        arm64) repo_arch=arm64-sbsa; deb_arch=arm64; openmpi_sha256="${OPENMPI_SHA256_AARCH64}"; ucx_sha256="${UCX_SHA256_AARCH64}" ;; \
+        amd64) repo_arch=x86_64; deb_arch=amd64; openmpi_sha256="${OPENMPI_SHA256_X86_64}"; ucx_sha256="${UCX_SHA256_X86_64}" ;; \
+        *) echo "Unsupported DOCA package architecture: ${TARGETARCH}" >&2; exit 1 ;; \
        esac \
-    && hpcx_url="https://content.mellanox.com/hpc/hpc-x/${HPCX_VERSION}_cuda13/hpcx-${HPCX_VERSION}-gcc-doca_ofed-ubuntu24.04-cuda13-${hpcx_arch}.tbz" \
-    && curl --fail --location "${hpcx_url}" --output /tmp/hpcx.tbz \
-    && echo "${hpcx_sha256}  /tmp/hpcx.tbz" | sha256sum --check - \
-    && mkdir -p /opt/hpcx \
-    && tar -xf /tmp/hpcx.tbz --strip-components=1 --directory=/opt/hpcx \
-    && rm /tmp/hpcx.tbz \
-    && test "$(cat /opt/hpcx/VERSION | head -n 1)" = "HPC-X ${HPCX_VERSION}" \
-    && test -x /opt/hpcx/ompi/bin/mpicc
+    && repo_url="https://linux.mellanox.com/public/repo/doca/${DOCA_VERSION}/ubuntu24.04/${repo_arch}/pool" \
+    && mkdir -p /packages \
+    && curl --fail --location \
+        "${repo_url}/openmpi_${OPENMPI_PACKAGE_VERSION}_${deb_arch}.deb" \
+        --output /packages/openmpi.deb \
+    && curl --fail --location \
+        "${repo_url}/ucx_${UCX_PACKAGE_VERSION}_${deb_arch}.deb" \
+        --output /packages/ucx.deb \
+    && echo "${openmpi_sha256}  /packages/openmpi.deb" | sha256sum --check - \
+    && echo "${ucx_sha256}  /packages/ucx.deb" | sha256sum --check -
 
-FROM hpcx AS builder
+FROM nvcr.io/nvidia/cuda:${CUDA_VERSION}-devel-ubuntu${UBUNTU_VERSION} AS builder
 
 ARG NCCL_PACKAGE_VERSION
 ARG CUDA_BINDINGS_VERSION
 ARG NCCL_TESTS_REF=717b68318278e93f371d8ffb46b076069d7c7851
+ARG OPENMPI_PACKAGE_VERSION
+ARG UCX_PACKAGE_VERSION
 
 SHELL ["/bin/bash", "-eux", "-c"]
 
+COPY --from=mpi-packages /packages /tmp/mpi-packages
+
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
+        /tmp/mpi-packages/openmpi.deb \
+        /tmp/mpi-packages/ucx.deb \
         ca-certificates \
         git \
         libnccl2="${NCCL_PACKAGE_VERSION}" \
@@ -54,9 +69,10 @@ RUN apt-get update \
         make \
         python3 \
         python3-pip \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN ln -s /opt/hpcx/ompi /usr/local/mpi
+    && rm -rf /var/lib/apt/lists/* /tmp/mpi-packages \
+    && test "$(dpkg-query -W -f='${Version}' openmpi)" = "${OPENMPI_PACKAGE_VERSION}" \
+    && test "$(dpkg-query -W -f='${Version}' ucx)" = "${UCX_PACKAGE_VERSION}" \
+    && test -x /usr/local/mpi/bin/mpicc
 
 RUN python3 -m pip install \
         --no-cache-dir \
@@ -85,9 +101,13 @@ ARG GIT_COMMIT_ID
 ARG NCCL_PACKAGE_VERSION
 ARG CUDA_BINDINGS_VERSION
 ARG NCCL_TESTS_REF=717b68318278e93f371d8ffb46b076069d7c7851
-ARG HPCX_VERSION
-ARG HPCX_SHA256_AARCH64
-ARG HPCX_SHA256_X86_64
+ARG DOCA_VERSION
+ARG OPENMPI_PACKAGE_VERSION
+ARG UCX_PACKAGE_VERSION
+ARG OPENMPI_SHA256_AARCH64
+ARG OPENMPI_SHA256_X86_64
+ARG UCX_SHA256_AARCH64
+ARG UCX_SHA256_X86_64
 ARG TARGETARCH
 
 LABEL org.opencontainers.image.title="MLPerf common utilities" \
@@ -97,13 +117,21 @@ LABEL org.opencontainers.image.title="MLPerf common utilities" \
       com.nvidia.mlperf.nccl-package-version="${NCCL_PACKAGE_VERSION}" \
       com.nvidia.mlperf.cuda-bindings-version="${CUDA_BINDINGS_VERSION}" \
       com.nvidia.mlperf.nccl-tests-revision="${NCCL_TESTS_REF}" \
-      com.nvidia.mlperf.hpcx-version="${HPCX_VERSION}" \
-      com.nvidia.mlperf.hpcx-architecture="${TARGETARCH}" \
-      com.nvidia.mlperf.hpcx-sha256-aarch64="${HPCX_SHA256_AARCH64}" \
-      com.nvidia.mlperf.hpcx-sha256-x86-64="${HPCX_SHA256_X86_64}"
+      com.nvidia.mlperf.doca-version="${DOCA_VERSION}" \
+      com.nvidia.mlperf.openmpi-package-version="${OPENMPI_PACKAGE_VERSION}" \
+      com.nvidia.mlperf.ucx-package-version="${UCX_PACKAGE_VERSION}" \
+      com.nvidia.mlperf.openmpi-sha256-aarch64="${OPENMPI_SHA256_AARCH64}" \
+      com.nvidia.mlperf.openmpi-sha256-x86-64="${OPENMPI_SHA256_X86_64}" \
+      com.nvidia.mlperf.ucx-sha256-aarch64="${UCX_SHA256_AARCH64}" \
+      com.nvidia.mlperf.ucx-sha256-x86-64="${UCX_SHA256_X86_64}" \
+      com.nvidia.mlperf.mpi-architecture="${TARGETARCH}"
+
+COPY --from=mpi-packages /packages /tmp/mpi-packages
 
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
+        /tmp/mpi-packages/openmpi.deb \
+        /tmp/mpi-packages/ucx.deb \
         ca-certificates \
         curl \
         file \
@@ -128,9 +156,10 @@ RUN apt-get update \
         wget \
         xz-utils \
         zstd \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* /tmp/mpi-packages \
+    && test "$(dpkg-query -W -f='${Version}' openmpi)" = "${OPENMPI_PACKAGE_VERSION}" \
+    && test "$(dpkg-query -W -f='${Version}' ucx)" = "${UCX_PACKAGE_VERSION}"
 
-COPY --from=hpcx /opt/hpcx /opt/hpcx
 COPY --from=builder /src/nccl-tests/build/*_perf_mpi /usr/local/bin/
 COPY --from=builder /opt/ncclstage /opt/ncclstage
 
@@ -138,15 +167,8 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONPATH=/opt/ncclstage/app:/opt/ncclstage/python
 ENV PATH=/usr/local/mpi/bin:${PATH}
 
-RUN ln -s /opt/hpcx/ompi /usr/local/mpi \
-    && ln -s /opt/ncclstage/app/ncclstage.py /usr/local/bin/ncclstage \
+RUN ln -s /opt/ncclstage/app/ncclstage.py /usr/local/bin/ncclstage \
     && chmod 0755 /opt/ncclstage/app/ncclstage.py \
-    && printf '%s\n' \
-        /opt/hpcx/ompi/lib \
-        /opt/hpcx/ucx/lib \
-        > /etc/ld.so.conf.d/hpcx.conf \
-    && ldconfig \
-    && test "$(cat /opt/hpcx/VERSION | head -n 1)" = "HPC-X ${HPCX_VERSION}" \
     && test -x "$(command -v mpirun)" \
     && ompi_info --version \
     && for binary in /usr/local/bin/*_perf_mpi; do \

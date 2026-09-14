@@ -145,8 +145,12 @@ RUN ln -s /opt/hpcx/ompi /usr/local/mpi \
     && test -x "$(command -v mpirun)" \
     && ompi_info --version \
     && for binary in /usr/local/bin/*_perf_mpi; do \
-           ! ldd "${binary}" | grep -q 'not found'; \
+           echo "Dynamic dependencies for ${binary}"; \
+           ldd "${binary}" > /tmp/nccl-test-ldd; \
+           cat /tmp/nccl-test-ldd; \
+           if grep -q 'not found' /tmp/nccl-test-ldd; then exit 1; fi; \
        done \
+    && rm /tmp/nccl-test-ldd \
     && /usr/local/bin/ncclstage --help >/dev/null \
     && python3 -c 'import cuda_api; from nccl_api import Nccl; print(f"NCCL {Nccl().version()}")' \
     && printf 'ncclstage_runtime_files=' \

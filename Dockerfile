@@ -74,6 +74,8 @@ RUN apt-get update \
     && test "$(dpkg-query -W -f='${Version}' ucx)" = "${UCX_PACKAGE_VERSION}" \
     && mpi_home="$(dirname "$(dirname "$(readlink -f /usr/bin/mpicc)")")" \
     && ln -s "${mpi_home}" /usr/local/mpi \
+    && printf '%s\n' /usr/local/mpi/lib > /etc/ld.so.conf.d/openmpi.conf \
+    && ldconfig \
     && test -x /usr/local/mpi/bin/mpicc
 
 RUN python3 -m pip install \
@@ -163,6 +165,8 @@ RUN apt-get update \
     && test "$(dpkg-query -W -f='${Version}' ucx)" = "${UCX_PACKAGE_VERSION}" \
     && mpi_home="$(dirname "$(dirname "$(readlink -f /usr/bin/mpicc)")")" \
     && ln -s "${mpi_home}" /usr/local/mpi \
+    && printf '%s\n' /usr/local/mpi/lib > /etc/ld.so.conf.d/openmpi.conf \
+    && ldconfig \
     && test -x /usr/local/mpi/bin/mpicc
 
 COPY --from=builder /src/nccl-tests/build/*_perf_mpi /usr/local/bin/
